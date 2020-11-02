@@ -73,3 +73,107 @@ Are male chinstrap penguions significantly larger in body mass than females? - t
 t.test(chinstraps_m, chinstraps_f, alternative = "greater") # are chinstrap_m greater than chinstrao_females
 ```
 
+#. Part 2 Beeswarm graph 
+
+Mean flipper lengths between the three species of penguins, females only
+
+### 1. Make a table of counts by species and sex
+
+```{r}
+penguin_counts <- penguins %>%
+  count(species, sex)
+
+penguin_counts
+
+# never enough to assume n > 30 is a normal sample, always do additional exploration
+```
+
+
+Create a subset of female penguins
+
+```{r}
+penguins_f <- penguins %>% 
+  filter(sex == "female")
+
+ggplot(data = penguins_f, aes(x = flipper_length_mm)) + geom_histogram(aes(fill = species)) +
+  facet_wrap(~species, scales = "free") # each panel has their own x and y axis limits, use when interested in distribution between groups
+
+ggplot(data = penguins_f, aes(sample = flipper_length_mm)) + geom_qq(aes(color = species)) + #change fill aes to color when points
+  facet_wrap(~species, scales = "free") # each panel has their own x and y axis limits, use when interested in distribution between groups
+
+```
+
+### Summary Statistics
+starting from penguins_f create a summary table that groups by species and returns the following:
+- mean of flipper length
+- sd of flipper length
+- sample size
+- variance
+- standard error
+
+```{r}
+penguins_f_summary <- penguins_f %>% 
+  group_by(species) %>% 
+  summarize(
+    mean_flipper_length = mean(flipper_length_mm),
+    sd_flipper_length = sd(flipper_length_mm),
+    sample_size = n(),
+    se_flipper_length = sd(flipper_length_mm)/sqrt(n()),
+    variance_flipper_length = var(flipper_length_mm)
+    )
+
+# use caution when using levene test, as sample size gets larger u will get a significant difference, similar to t tests
+#levene test for equal variances
+# look at Pr(>F) value
+leveneTest(flipper_length_mm ~ species, data = penguins_f) # compare variances of flipper lengths for species in the data set penguins_f
+
+```
+
+### Beeswarm plot with mean +/- one sd
+
+```{r}
+ggplot() +
+  geom_beeswarm(data = penguins_f, 
+                aes(x = species, y = flipper_length_mm),
+                color = "gray70",
+                size = 3,
+                alpha = 0.5) +
+  geom_point(data = penguins_f_summary, aes(x = species, y = mean_flipper_length), # layering the mean data points on top of the graph 
+             size =4) +
+  geom_errorbar(data = penguins_f_summary, 
+                aes(x = species, 
+                    ymax = mean_flipper_length + sd_flipper_length,
+                    ymin = mean_flipper_length - sd_flipper_length), # we want error bars to be one sd above the mean, and one sd below the mean
+                width = 0.1) + # changes width of error bars
+  theme_classic()
+```
+
+### One-way ANOVA
+
+```{r}
+penguin_aov <- aov(flipper_length_mm ~ species, data = penguins_f)
+summary(penguin_aov)
+
+# F value is so high, which means variance between groups is large, and within groups are small, there is a very small p-value. here we would reject the null hypothesis, that flipper length for all three species of penguins are the same
+
+# post hoc test- use this to find out which level in the anova is or is not significantly different
+
+TukeyHSD(penguin_aov) # there is a significant difference of flipper length between all three species
+
+```
+
+
+> for unbalanaced samples -- Use a Type III Anova with the car package:
+1. create a linear model
+
+```{r}
+penguin_lm <- lm(flipper_length_mm ~ species, data = penguins_f) # creating linear model
+penguin_aov_t3 <- Anova(penguin_lm, type = "III")
+penguin_aov_t3
+
+# results are pretty darn close, but you would use this in the "wild" when you have unbalanced design, very different sample sizes 
+```
+
+
+
+
